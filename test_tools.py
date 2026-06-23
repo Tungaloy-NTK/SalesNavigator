@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 from datetime import date, datetime
-import json
 import database as db
 import alert_engine as ae
 
