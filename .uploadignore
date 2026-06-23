@@ -1,0 +1,15 @@
+# Do NOT upload these to the server
+*.pyc
+__pycache__/
+*.db
+*_backup_*.db
+venv/
+.env
+rep_packs_*/
+lost_items_unmatched_*.txt
+lost_items_errors_*.txt
+Regular_items_not_ordered_*.xlsx
+SalesNavigator_*.py
+SalesNavigator_*.ps1
+export_lost_items_*.py
+push_lost_items_to_lacrm.py

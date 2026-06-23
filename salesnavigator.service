@@ -1,0 +1,15 @@
+[Unit]
+Description=Tungaloy Sales Navigator
+After=network.target
+
+[Service]
+Type=simple
+User=YOUR_CPANEL_USERNAME
+WorkingDirectory=/home/YOUR_CPANEL_USERNAME/salesnavigator
+ExecStart=/home/YOUR_CPANEL_USERNAME/salesnavigator/venv/bin/streamlit run app.py --server.port 8501 --server.headless true
+Restart=always
+RestartSec=10
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
