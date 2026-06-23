@@ -255,7 +255,7 @@ def page_new_request():
         recipients = []
         admins = db.get_all_users()
         for user in admins:
-            if user["role"] in ("admin", "regional_manager", "marketing") and user.get("email"):
+            if user["role"] == "admin" and user.get("email"):
                 recipients.append(user["email"])
         if rep and rep.get("regional_manager_id"):
             mgr = db.get_user_by_id(rep["regional_manager_id"])
