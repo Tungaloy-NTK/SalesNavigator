@@ -252,12 +252,17 @@ def page_new_request():
           <tbody>{items_html}</tbody>
         </table>
         <p>Log in to Sales Navigator to approve or reject. Request IDs: {', '.join(f'#{r}' for r in req_ids)}</p>"""
-        recipients = [admin_email]
+        recipients = []
+        admins = db.get_all_users()
+        for user in admins:
+            if user["role"] in ("admin", "regional_manager", "marketing") and user.get("email"):
+                recipients.append(user["email"])
         if rep and rep.get("regional_manager_id"):
             mgr = db.get_user_by_id(rep["regional_manager_id"])
             if mgr and mgr["email"] not in recipients:
                 recipients.append(mgr["email"])
-        ae.send_email(recipients, subject, body)
+        if recipients:
+            ae.send_email(recipients, subject, body)
 
         # Clear all tt_ state
         for k in list(st.session_state.keys()):
