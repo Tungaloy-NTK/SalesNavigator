@@ -480,6 +480,7 @@ def init_db():
             ("ship_to_contact",       "TEXT"),
             ("ship_to_email",         "TEXT"),
             ("ship_to_phone",         "TEXT"),
+            ("items",                 "TEXT"),
         ]:
             if col not in existing:
                 conn.execute(f"ALTER TABLE test_tool_requests ADD COLUMN {col} {typedef}")

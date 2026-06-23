@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import date, datetime
+import json
 import database as db
 import alert_engine as ae
 
@@ -191,45 +192,45 @@ def page_new_request():
             st.warning(f"⚠️ An active test request already exists for item(s) {', '.join(dupe_items)} at this customer. Check existing requests before creating a duplicate.")
             return
 
-        # Create one request per item line
+        # Create ONE request with all items as JSON
         admin_email = db.get_setting("email_from") or "Rob.Werhun@tungaloyuk.co.uk"
         rep = db.get_user_by_id(st.session_state["user_id"])
         rep_name = rep["full_name"] if rep else "Unknown"
-        req_ids = []
 
         diff_delivery = st.session_state.get("tt_diff_delivery", False)
-        for item in items:
-            data = {
-                "customer_code":         cust_code,
-                "customer_name":         cust_name,
-                "contact_name":          contact_name.strip(),
-                "contact_email":         contact_email.strip() or None,
-                "contact2_name":         contact2_name.strip() or None,
-                "contact2_email":        contact2_email.strip() or None,
-                "ship_to_company":       st.session_state.get("tt_ship_company", "").strip() or None if diff_delivery else None,
-                "ship_to_address":       st.session_state.get("tt_ship_address", "").strip() or None if diff_delivery else None,
-                "ship_to_contact":       st.session_state.get("tt_ship_contact", "").strip() or None if diff_delivery else None,
-                "ship_to_email":         st.session_state.get("tt_ship_email", "").strip() or None if diff_delivery else None,
-                "ship_to_phone":         st.session_state.get("tt_ship_phone", "").strip() or None if diff_delivery else None,
-                "item_code":             item["item_code"],
-                "item_desc":             item["item_desc"] or None,
-                "quantity":              item["quantity"],
-                "reason":                reason,
-                "reason_other":          reason_other.strip() or None,
-                "needed_by_date":        needed_by.strftime("%Y-%m-%d"),
-                "trial_run_date":        trial_run_date.strftime("%Y-%m-%d") if trial_run_date else None,
-                "trial_completion_date": trial_end_date.strftime("%Y-%m-%d") if trial_end_date else None,
-                "notes":                 notes.strip() or None,
-                "requested_by":          st.session_state["user_id"],
-                "sm_name":               "",
-                "status":                "submitted",
-            }
-            req_id = db.create_test_request(data)
-            db.log_test_update(req_id, st.session_state["user_id"], "created", None, "submitted", "Request submitted")
-            db.log_audit(st.session_state["user_id"], st.session_state["full_name"], "create", "test_request",
-                         entity_id=req_id, entity_label=f"{cust_name} — {item['item_code']}",
-                         details=f"Reason: {reason}, Qty: {item['quantity']}")
-            req_ids.append(req_id)
+        first_item = items[0]
+        data = {
+            "customer_code":         cust_code,
+            "customer_name":         cust_name,
+            "contact_name":          contact_name.strip(),
+            "contact_email":         contact_email.strip() or None,
+            "contact2_name":         contact2_name.strip() or None,
+            "contact2_email":        contact2_email.strip() or None,
+            "ship_to_company":       st.session_state.get("tt_ship_company", "").strip() or None if diff_delivery else None,
+            "ship_to_address":       st.session_state.get("tt_ship_address", "").strip() or None if diff_delivery else None,
+            "ship_to_contact":       st.session_state.get("tt_ship_contact", "").strip() or None if diff_delivery else None,
+            "ship_to_email":         st.session_state.get("tt_ship_email", "").strip() or None if diff_delivery else None,
+            "ship_to_phone":         st.session_state.get("tt_ship_phone", "").strip() or None if diff_delivery else None,
+            "item_code":             first_item["item_code"],
+            "item_desc":             first_item["item_desc"] or None,
+            "quantity":              first_item["quantity"],
+            "items":                 json.dumps(items),
+            "reason":                reason,
+            "reason_other":          reason_other.strip() or None,
+            "needed_by_date":        needed_by.strftime("%Y-%m-%d"),
+            "trial_run_date":        trial_run_date.strftime("%Y-%m-%d") if trial_run_date else None,
+            "trial_completion_date": trial_end_date.strftime("%Y-%m-%d") if trial_end_date else None,
+            "notes":                 notes.strip() or None,
+            "requested_by":          st.session_state["user_id"],
+            "sm_name":               "",
+            "status":                "submitted",
+        }
+        req_id = db.create_test_request(data)
+        db.log_test_update(req_id, st.session_state["user_id"], "created", None, "submitted", "Request submitted")
+        db.log_audit(st.session_state["user_id"], st.session_state["full_name"], "create", "test_request",
+                     entity_id=req_id, entity_label=f"{cust_name} — {len(items)} items",
+                     details=f"Reason: {reason}, Items: {', '.join(i['item_code'] for i in items)}")
+        req_ids = [req_id]
 
         # Email approvers — list all items in one email
         items_html = "".join(
@@ -238,8 +239,9 @@ def page_new_request():
             f"<td style='padding:4px 8px'>{it['quantity']}</td></tr>"
             for it in items
         )
-        subject = f"Test Tool Request — {cust_name} — {len(items)} item(s)"
-        body = f"""<h2>New Test Tool Request</h2>
+        subject = f"Test Tool Request FOR APPROVAL — {cust_name} ({len(items)} items)"
+        app_url = "https://tungsalesnav.streamlit.app"
+        body = f"""<h2>New Test Tool Request — Awaiting Your Approval</h2>
         <p><b>Requester:</b> {rep_name}</p>
         <p><b>Customer:</b> {cust_name}</p>
         <p><b>Contact:</b> {contact_name.strip()}</p>
@@ -251,7 +253,8 @@ def page_new_request():
           </tr></thead>
           <tbody>{items_html}</tbody>
         </table>
-        <p>Log in to Sales Navigator to approve or reject. Request IDs: {', '.join(f'#{r}' for r in req_ids)}</p>"""
+        <p style="margin-top:20px"><a href="{app_url}" style="background:#d32f2f;color:white;padding:10px 20px;text-decoration:none;border-radius:4px;font-weight:bold">👉 Review Request in Sales Navigator</a></p>
+        <p style="font-size:12px;color:#666">Request IDs: {', '.join(f'#{r}' for r in req_ids)}</p>"""
         recipients = []
         admins = db.get_all_users()
         for user in admins:
@@ -319,7 +322,14 @@ def page_test_tools_list():
     for r in requests:
         c1, c2, c3, c4, c5, c6, c7 = st.columns([1, 3, 2, 2, 2, 1, 1])
         c1.write(f"#{r['id']}")
-        c2.write(f"**{r['customer_name']}**\n{r['item_code']} × {r['quantity']}")
+        items_display = r['item_code'] + f" × {r['quantity']}"
+        if r.get("items"):
+            try:
+                items_list = json.loads(r["items"])
+                items_display = ", ".join(f"{i['item_code']} × {i['quantity']}" for i in items_list)
+            except:
+                pass
+        c2.write(f"**{r['customer_name']}**\n{items_display}")
         c3.write(r["requester_name"])
         c4.write(fmt_date(r["created_at"]))
         c5.markdown(status_badge(r["status"]), unsafe_allow_html=True)
@@ -352,9 +362,26 @@ def page_test_tools_detail():
     # Summary cards
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Customer", r["customer_name"])
-    col2.metric("Part Number", f"{r['item_code']} × {r['quantity']}")
+    items_count = len(json.loads(r["items"])) if r.get("items") else 1
+    col2.metric("Items", f"{items_count} part(s)")
     col3.metric("Requested By", r["requester_name"])
     col4.metric("Needed By", fmt_date(r["needed_by_date"]))
+
+    st.markdown("---")
+
+    # Items table
+    st.markdown("### 📦 Items Requested")
+    items_list = []
+    if r.get("items"):
+        try:
+            items_list = json.loads(r["items"])
+        except:
+            items_list = [{"item_code": r["item_code"], "item_desc": r["item_desc"], "quantity": r["quantity"]}]
+    else:
+        items_list = [{"item_code": r["item_code"], "item_desc": r["item_desc"], "quantity": r["quantity"]}]
+
+    items_df = pd.DataFrame(items_list)
+    st.dataframe(items_df[["item_code", "item_desc", "quantity"]], use_container_width=True, hide_index=True)
 
     st.markdown("---")
 
