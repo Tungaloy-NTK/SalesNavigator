@@ -426,60 +426,56 @@ def page_test_tools_detail():
     role    = st.session_state["role"]
     user_id = st.session_state["user_id"]
 
-    # ── Approval section (admin / regional manager) ──
+    # ── Approval & Despatch (combined) ──
     if r["status"] == "submitted" and role in ("admin", "regional_manager", "marketing"):
-        st.markdown("### ✅ Approval")
-        col1, col2 = st.columns(2)
-        if col1.button("Approve ✅", type="primary", key="approve_btn"):
-            db.update_test_request(r["id"], {"status": "approved", "approved_by": user_id, "approved_at": datetime.now().strftime("%Y-%m-%d %H:%M")})
-            db.log_test_update(r["id"], user_id, "status_change", "submitted", "approved", "Approved")
+        st.markdown("### ✅ Approval & Despatch")
+        with st.form("approval_despatch_form"):
+            col1, col2 = st.columns(2)
+            order_no      = col1.text_input("Order / Shipping Number *", help="Internal order number or courier tracking reference")
+            delivery_date = col2.date_input("Expected Delivery Date *", help="When the tools are expected to arrive at the customer")
+
+            col1, col2, col3 = st.columns([2, 1, 1])
+            approve_submit = col1.form_submit_button("✅ Approve & Send", type="primary")
+            reject_submit = col2.form_submit_button("❌ Reject")
+
+            reject_reason = col3.text_input("Rejection reason (if rejecting)", label_visibility="collapsed")
+
+        if approve_submit and order_no.strip():
+            db.update_test_request(r["id"], {
+                "status": "despatched",
+                "approved_by": user_id,
+                "approved_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                "despatch_order_number": order_no.strip(),
+                "despatch_date": date.today().strftime("%Y-%m-%d"),
+                "expected_delivery_date": delivery_date.strftime("%Y-%m-%d"),
+                "despatched_by": user_id,
+            })
+            db.log_test_update(r["id"], user_id, "status_change", "submitted", "despatched", f"Approved & despatched. Order: {order_no.strip()}")
             db.log_audit(user_id, st.session_state["full_name"], "update", "test_request",
                          entity_id=r["id"], entity_label=f"{r['customer_name']} — {r['item_code']}",
-                         details="Approved")
+                         details=f"Approved & despatched. Order: {order_no.strip()}, Expected delivery: {delivery_date.strftime('%d %b %Y')}")
             rep = db.get_user_by_id(r["requested_by"])
             ae.send_email([rep["email"]], f"Test Tool #{r['id']} APPROVED — {r['item_code']}",
                          f"<h2>Your test tool request has been approved</h2>"
-                         f"<p>{r['customer_name']} — {r['item_code']} × {r['quantity']}</p>"
-                         f"<p>Please arrange for the tools to be sent.</p>")
-            st.success("Approved. Rep notified by email.")
+                         f"<p><b>{r['customer_name']}</b> — {r['item_code']}</p>"
+                         f"<p>We are sending the tools now.</p>"
+                         f"<p><b>Expected delivery:</b> {delivery_date.strftime('%d %b %Y')}</p>"
+                         f"<p><b>Order number:</b> {order_no.strip()}</p>")
+            st.success("Approved and despatched. Rep notified by email. 7-day follow-up clock started.")
             st.rerun()
 
-        reject_reason = col2.text_input("Rejection reason")
-        if col2.button("Reject ❌", key="reject_btn"):
-            db.update_test_request(r["id"], {"status": "rejected", "approved_by": user_id, "approved_at": datetime.now().strftime("%Y-%m-%d %H:%M"), "rejection_reason": reject_reason})
-            db.log_test_update(r["id"], user_id, "status_change", "submitted", "rejected", reject_reason)
+        elif reject_submit:
+            db.update_test_request(r["id"], {"status": "rejected", "approved_by": user_id, "approved_at": datetime.now().strftime("%Y-%m-%d %H:%M"), "rejection_reason": reject_reason or "No reason given"})
+            db.log_test_update(r["id"], user_id, "status_change", "submitted", "rejected", reject_reason or "Rejected")
             db.log_audit(user_id, st.session_state["full_name"], "update", "test_request",
                          entity_id=r["id"], entity_label=f"{r['customer_name']} — {r['item_code']}",
                          details=f"Rejected: {reject_reason or 'No reason given'}")
             rep = db.get_user_by_id(r["requested_by"])
             ae.send_email([rep["email"]], f"Test Tool #{r['id']} REJECTED — {r['item_code']}",
                          f"<h2>Your test tool request has been rejected</h2>"
-                         f"<p>{r['customer_name']} — {r['item_code']}</p>"
+                         f"<p><b>{r['customer_name']}</b> — {r['item_code']}</p>"
                          f"<p><b>Reason:</b> {reject_reason or 'Not specified'}</p>")
             st.success("Rejected. Rep notified by email.")
-            st.rerun()
-
-    # ── Despatch section (admin only) ──
-    if r["status"] == "approved" and role in ("admin", "marketing"):
-        st.markdown("### 📦 Log Despatch")
-        with st.form("despatch_form"):
-            col1, col2 = st.columns(2)
-            order_no     = col1.text_input("Order / Shipping Number *", help="Internal order number or courier tracking reference")
-            delivery_date = col2.date_input("Expected Delivery Date *", help="When the tools are expected to arrive at the customer")
-            desp_submit  = st.form_submit_button("Mark as Despatched", type="primary")
-        if desp_submit and order_no.strip():
-            db.update_test_request(r["id"], {
-                "status": "despatched",
-                "despatch_order_number": order_no.strip(),
-                "despatch_date": date.today().strftime("%Y-%m-%d"),
-                "expected_delivery_date": delivery_date.strftime("%Y-%m-%d"),
-                "despatched_by": user_id,
-            })
-            db.log_test_update(r["id"], user_id, "status_change", "approved", "despatched", f"Order: {order_no.strip()}")
-            db.log_audit(user_id, st.session_state["full_name"], "update", "test_request",
-                         entity_id=r["id"], entity_label=f"{r['customer_name']} — {r['item_code']}",
-                         details=f"Despatched, Order: {order_no.strip()}")
-            st.success("Marked as despatched. 7-day follow-up clock started.")
             st.rerun()
 
     # ── Test report section (rep) ──
