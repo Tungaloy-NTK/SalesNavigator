@@ -1660,8 +1660,9 @@ def page_upload():
 
         # ── Download section ──
         with col1:
-            st.markdown("#### 📥 Download All Customers")
-            if st.button("⬇️ Download as Excel", type="primary", use_container_width=True):
+            st.markdown("#### 📥 Download All Contact Data")
+            st.caption("Customers + all contact email addresses for campaigns")
+            if st.button("⬇️ Download Complete Data", type="primary", use_container_width=True):
                 with st.spinner("Preparing export…"):
                     import pandas as pd
                     import io
@@ -1669,46 +1670,65 @@ def page_upload():
                     from openpyxl.styles import Font, PatternFill, Alignment
 
                     with db.get_conn() as conn:
+                        # Get all customers
                         customers = conn.execute(
-                            "SELECT id, customer_code, customer_name, sm_name, user_id FROM customers ORDER BY customer_code"
+                            "SELECT id, customer_code, customer_name, sm_name FROM customers ORDER BY customer_code"
                         ).fetchall()
 
-                    # Convert to DataFrame
-                    df = pd.DataFrame(customers)
+                        # Get all test request contacts with emails
+                        test_contacts = conn.execute(
+                            "SELECT DISTINCT customer_code, customer_name, contact_name, contact_email FROM test_tool_requests WHERE contact_email IS NOT NULL AND contact_email != '' ORDER BY customer_code"
+                        ).fetchall()
 
-                    # Create Excel file
+                        # Get all marketing lead contacts with emails
+                        lead_contacts = conn.execute(
+                            "SELECT DISTINCT customer_code, customer_name, contact_name, contact_email FROM marketing_leads WHERE contact_email IS NOT NULL AND contact_email != '' ORDER BY customer_code"
+                        ).fetchall()
+
+                    # Convert to DataFrames
+                    df_customers = pd.DataFrame(customers)
+                    df_test = pd.DataFrame(test_contacts) if test_contacts else pd.DataFrame(columns=['customer_code', 'customer_name', 'contact_name', 'contact_email'])
+                    df_leads = pd.DataFrame(lead_contacts) if lead_contacts else pd.DataFrame(columns=['customer_code', 'customer_name', 'contact_name', 'contact_email'])
+
+                    # Create Excel file with multiple sheets
                     output = io.BytesIO()
                     with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                        df.to_excel(writer, sheet_name='Customers', index=False)
+                        df_customers.to_excel(writer, sheet_name='Customers', index=False)
+                        if not df_test.empty:
+                            df_test.to_excel(writer, sheet_name='Test Contacts', index=False)
+                        if not df_leads.empty:
+                            df_leads.to_excel(writer, sheet_name='Lead Contacts', index=False)
 
-                        # Format header
+                        # Format all sheets
                         workbook = writer.book
-                        worksheet = writer.sheets['Customers']
-                        for cell in worksheet[1]:
-                            cell.font = Font(bold=True, color="FFFFFF")
-                            cell.fill = PatternFill(start_color="1a1a2e", end_color="1a1a2e", fill_type="solid")
-                            cell.alignment = Alignment(horizontal="center")
+                        for sheet_name in workbook.sheetnames:
+                            worksheet = writer.sheets[sheet_name]
+                            for cell in worksheet[1]:
+                                cell.font = Font(bold=True, color="FFFFFF")
+                                cell.fill = PatternFill(start_color="1a1a2e", end_color="1a1a2e", fill_type="solid")
+                                cell.alignment = Alignment(horizontal="center")
 
-                        # Auto-adjust column widths
-                        for column in worksheet.columns:
-                            max_length = 0
-                            column_letter = column[0].column_letter
-                            for cell in column:
-                                try:
-                                    if len(str(cell.value)) > max_length:
-                                        max_length = len(str(cell.value))
-                                except:
-                                    pass
-                            worksheet.column_dimensions[column_letter].width = min(max_length + 2, 50)
+                            # Auto-adjust column widths
+                            for column in worksheet.columns:
+                                max_length = 0
+                                column_letter = column[0].column_letter
+                                for cell in column:
+                                    try:
+                                        if len(str(cell.value)) > max_length:
+                                            max_length = len(str(cell.value))
+                                    except:
+                                        pass
+                                worksheet.column_dimensions[column_letter].width = min(max_length + 2, 50)
 
                     output.seek(0)
                     st.download_button(
-                        label="📄 Download Complete Data",
+                        label="📄 Download All Data",
                         data=output.getvalue(),
-                        file_name=f"customer_data_export_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                        file_name=f"all_contact_data_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     )
-                    st.success("✅ Export ready! Click the download button above.")
+                    st.success(f"✅ Export ready! Includes:")
+                    st.caption(f"• {len(df_customers)} customers\n• {len(df_test)} test request contacts\n• {len(df_leads)} marketing lead contacts")
 
         # ── Upload section ──
         with col2:
