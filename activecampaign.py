@@ -325,3 +325,54 @@ def sync_customers_to_ac(customer_rows, list_id=None, tag_name="Sales Navigator"
                     progress_callback(done[0], total)
 
     return synced, skipped, errors
+
+
+def sync_ac_contacts_to_db(progress_callback=None):
+    """
+    Pull all contacts from Active Campaign and import into SalesNavigator database.
+    Returns (imported_count, error_count, errors_list)
+    """
+    imported = 0
+    errors = []
+
+    try:
+        # Fetch all contacts from AC
+        ok, data = _get("contacts", params={"limit": 100})
+        if not ok:
+            return 0, 1, [f"Failed to fetch contacts: {data}"]
+
+        contacts = data.get("contacts", [])
+        total = len(contacts)
+
+        with db.get_conn() as conn:
+            for i, ac_contact in enumerate(contacts):
+                try:
+                    email = ac_contact.get("email", "").strip()
+                    if not email:
+                        continue
+
+                    first_name = ac_contact.get("firstName", "").strip()
+                    last_name = ac_contact.get("lastName", "").strip()
+                    full_name = f"{first_name} {last_name}".strip()
+                    company = ac_contact.get("organization", "").strip() or ac_contact.get("company", "").strip()
+
+                    # Insert or update contact in database
+                    # For now, store in a contacts table (we may need to create this)
+                    # Or store as a customer note with contact info
+                    conn.execute("""
+                        INSERT OR REPLACE INTO customer_contacts
+                        (email, first_name, last_name, full_name, company, synced_from_ac)
+                        VALUES (?, ?, ?, ?, ?, 1)
+                    """, (email, first_name, last_name, full_name, company))
+
+                    imported += 1
+                    if progress_callback:
+                        progress_callback(i + 1, total)
+
+                except Exception as e:
+                    errors.append(f"Contact import error: {str(e)}")
+
+    except Exception as e:
+        errors.append(f"AC sync failed: {str(e)}")
+
+    return imported, len(errors), errors

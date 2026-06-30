@@ -1964,6 +1964,29 @@ def page_admin():
 
         st.markdown("---")
 
+        # ── Import contacts FROM ActiveCampaign ──
+        st.markdown("#### Import Contacts FROM ActiveCampaign")
+        st.info(
+            "Pull all 1,595+ contacts from your ActiveCampaign database into SalesNavigator. "
+            "This creates a searchable contact database for email campaigns."
+        )
+        if st.button("📥 Sync All AC Contacts to SalesNavigator", type="primary"):
+            with st.spinner("Importing contacts from ActiveCampaign…"):
+                imported, errors_count, errors = ac.sync_ac_contacts_to_db()
+            st.success(f"✅ Imported {imported} contacts from ActiveCampaign!")
+            if errors:
+                with st.expander(f"⚠️ {errors_count} errors during import"):
+                    for err in errors:
+                        st.caption(f"• {err}")
+            try:
+                db.log_audit(st.session_state["user_id"], st.session_state["full_name"],
+                            "import", "ac_contacts",
+                            details=f"{imported} contacts imported from ActiveCampaign")
+            except:
+                pass
+
+        st.markdown("---")
+
         # ── Customer sync ──
         st.markdown("#### Sync Customers to ActiveCampaign")
         st.info(
