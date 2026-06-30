@@ -529,6 +529,29 @@ def init_db():
         if "contact_name" not in existing_pv:
             conn.execute("ALTER TABLE planned_visits ADD COLUMN contact_name TEXT")
 
+        # Add missing columns to customer_contacts table
+        existing_contacts = [r["name"] for r in conn.execute("PRAGMA table_info(customer_contacts)").fetchall()]
+        for col, typedef in [
+            ("first_name",    "TEXT"),
+            ("last_name",     "TEXT"),
+            ("full_name",     "TEXT"),
+            ("company",       "TEXT"),
+            ("phone",         "TEXT"),
+            ("address",       "TEXT"),
+            ("city",          "TEXT"),
+            ("state",         "TEXT"),
+            ("postal_code",   "TEXT"),
+            ("country",       "TEXT"),
+            ("customer_code", "TEXT"),
+            ("notes",         "TEXT"),
+            ("ac_contact_id", "TEXT"),
+        ]:
+            if col not in existing_contacts:
+                try:
+                    conn.execute(f"ALTER TABLE customer_contacts ADD COLUMN {col} {typedef}")
+                except Exception as e:
+                    print(f"Could not add {col} to customer_contacts: {e}")
+
         # Create expenses table if not present (migration for existing databases)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS expenses (
