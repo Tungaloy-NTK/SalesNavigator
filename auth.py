@@ -196,12 +196,15 @@ def set_session(user):
     # Create and store session token for persistence across page refreshes
     import secrets
     session_token = secrets.token_urlsafe(32)
-    with db.get_conn() as conn:
-        conn.execute("UPDATE users SET session_token=? WHERE id=?", (session_token, user["id"]))
-
-    # Store token in URL query params for persistence
-    st.query_params["session_token"] = session_token
-    st.query_params["user_id"] = str(user["id"])
+    try:
+        with db.get_conn() as conn:
+            conn.execute("UPDATE users SET session_token=? WHERE id=?", (session_token, user["id"]))
+        # Store token in URL query params for persistence
+        st.query_params["session_token"] = session_token
+        st.query_params["user_id"] = str(user["id"])
+    except:
+        # Column might not exist yet during initial deployment — skip token storage
+        pass
 
 def logout():
     for key in ["user_id","username","full_name","role","email","sm_names",
@@ -235,9 +238,9 @@ def is_logged_in():
 
     # Check if we can restore session from query params (after page refresh)
     if st.query_params.get("session_token"):
-        token = st.query_params.get("session_token")
-        user_id = st.query_params.get("user_id")
         try:
+            token = st.query_params.get("session_token")
+            user_id = st.query_params.get("user_id")
             user_id = int(user_id)
             user = db.get_user_by_id(user_id)
             if user and user.get("session_token") == token:
@@ -253,6 +256,7 @@ def is_logged_in():
                 st.session_state["last_activity"] = datetime.now()
                 return True
         except:
+            # Token validation failed or column doesn't exist yet — require new login
             pass
 
     return False
