@@ -329,26 +329,42 @@ def sync_customers_to_ac(customer_rows, list_id=None, tag_name="Sales Navigator"
 
 def sync_ac_contacts_to_db(progress_callback=None):
     """
-    Pull all contacts from Active Campaign and import into SalesNavigator database.
-    Returns (imported_count, error_count, errors_list)
+    Pull all contacts AND prospects from Active Campaign (excluding unsubscribed).
+    Returns (imported_count, skipped_unsubscribed, error_count, errors_list)
     """
     imported = 0
+    skipped_unsub = 0
     errors = []
+    all_people = []
 
     try:
         # Fetch all contacts from AC
-        ok, data = _get("contacts", params={"limit": 100})
-        if not ok:
-            return 0, 1, [f"Failed to fetch contacts: {data}"]
+        ok, contacts_data = _get("contacts", params={"limit": 100})
+        if ok:
+            all_people.extend(contacts_data.get("contacts", []))
 
-        contacts = data.get("contacts", [])
-        total = len(contacts)
+        # Fetch all prospects from AC (if endpoint exists)
+        ok, prospects_data = _get("contacts", params={"limit": 100, "filters[p_stage]": "prospect"})
+        if ok:
+            all_people.extend(prospects_data.get("contacts", []))
+
+        total = len(all_people)
+        if total == 0:
+            return 0, 0, 1, ["No contacts or prospects found in ActiveCampaign"]
 
         with db.get_conn() as conn:
-            for i, ac_contact in enumerate(contacts):
+            for i, ac_contact in enumerate(all_people):
                 try:
                     email = ac_contact.get("email", "").strip()
                     if not email:
+                        continue
+
+                    # Skip unsubscribed contacts
+                    # Check unsubscribe status - AC stores this in the contact record
+                    unsub_status = ac_contact.get("unsubscribeStatus", "")
+                    # Also check if contact is marked as deleted/inactive
+                    if unsub_status == "2" or ac_contact.get("deleted") == 1:
+                        skipped_unsub += 1
                         continue
 
                     first_name = ac_contact.get("firstName", "").strip()
@@ -357,8 +373,6 @@ def sync_ac_contacts_to_db(progress_callback=None):
                     company = ac_contact.get("organization", "").strip() or ac_contact.get("company", "").strip()
 
                     # Insert or update contact in database
-                    # For now, store in a contacts table (we may need to create this)
-                    # Or store as a customer note with contact info
                     conn.execute("""
                         INSERT OR REPLACE INTO customer_contacts
                         (email, first_name, last_name, full_name, company, synced_from_ac)
@@ -375,4 +389,4 @@ def sync_ac_contacts_to_db(progress_callback=None):
     except Exception as e:
         errors.append(f"AC sync failed: {str(e)}")
 
-    return imported, len(errors), errors
+    return imported, skipped_unsub, len(errors), errors

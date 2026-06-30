@@ -1965,15 +1965,16 @@ def page_admin():
         st.markdown("---")
 
         # ── Import contacts FROM ActiveCampaign ──
-        st.markdown("#### Import Contacts FROM ActiveCampaign")
+        st.markdown("#### Import Contacts & Prospects FROM ActiveCampaign")
         st.info(
-            "Pull all 1,595+ contacts from your ActiveCampaign database into SalesNavigator. "
+            "Pull all contacts (1,595) + prospects (2,611) from your ActiveCampaign database. "
+            "Unsubscribed contacts are automatically excluded. "
             "This creates a searchable contact database for email campaigns."
         )
-        if st.button("📥 Sync All AC Contacts to SalesNavigator", type="primary"):
-            with st.spinner("Importing contacts from ActiveCampaign…"):
-                imported, errors_count, errors = ac.sync_ac_contacts_to_db()
-            st.success(f"✅ Imported {imported} contacts from ActiveCampaign!")
+        if st.button("📥 Sync AC Contacts & Prospects to SalesNavigator", type="primary"):
+            with st.spinner("Importing contacts & prospects from ActiveCampaign…"):
+                imported, skipped_unsub, errors_count, errors = ac.sync_ac_contacts_to_db()
+            st.success(f"✅ Imported {imported} contacts! (Skipped {skipped_unsub} unsubscribed)")
             if errors:
                 with st.expander(f"⚠️ {errors_count} errors during import"):
                     for err in errors:
@@ -1981,7 +1982,7 @@ def page_admin():
             try:
                 db.log_audit(st.session_state["user_id"], st.session_state["full_name"],
                             "import", "ac_contacts",
-                            details=f"{imported} contacts imported from ActiveCampaign")
+                            details=f"{imported} contacts imported ({skipped_unsub} unsubscribed excluded)")
             except:
                 pass
 
