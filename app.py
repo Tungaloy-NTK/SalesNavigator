@@ -1554,7 +1554,7 @@ def page_upload():
             sheet = wb.active
             sheet.title = "Customer Info"
 
-            headers = ["Customer Code", "Customer Type", "Post Area", "Region", "City", "Salesman Name"]
+            headers = ["Customer Code", "Customer Type", "Post Area", "Region", "Salesman Name"]
             for col_num, header in enumerate(headers, 1):
                 cell = sheet.cell(row=1, column=col_num)
                 cell.value = header
@@ -1563,9 +1563,9 @@ def page_upload():
                 cell.alignment = Alignment(horizontal="center")
 
             example_data = [
-                [887, "End User", "G", "Scotland", "Glasgow", "SCOTLAND-W-HAMILTON"],
-                [511, "Distributor", "S", "Scotland", "Edinburgh", "SCOTLAND-W-HAMILTON"],
-                [228, "End User", "CV", "West Midlands", "Coventry", "TURNOCK-WMIDS"],
+                [887, "End User", "G", "Scotland", "SCOTLAND-W-HAMILTON"],
+                [511, "Distributor", "S", "Scotland", "SCOTLAND-W-HAMILTON"],
+                [228, "End User", "CV", "West Midlands", "TURNOCK-WMIDS"],
             ]
             for row_num, row_data in enumerate(example_data, 2):
                 for col_num, value in enumerate(row_data, 1):
@@ -1596,7 +1596,7 @@ def page_upload():
 
             st.success(f"File read successfully: **{len(cust_df):,} customer records**")
 
-            preview_cols = [c for c in ["customer_code","customer_type","post_area","region","city","salesman_name","main_distributor"] if c in cust_df.columns]
+            preview_cols = [c for c in ["customer_code","customer_type","post_area","region","salesman_name","main_distributor"] if c in cust_df.columns]
             with st.expander("Preview first 10 rows"):
                 st.dataframe(cust_df[preview_cols].head(10), use_container_width=True, hide_index=True)
 
