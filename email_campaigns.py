@@ -149,18 +149,21 @@ def tab_campaigns(user):
                 st.markdown(c['body_html'], unsafe_allow_html=True)
 
             # Actions row
-            a1, a2, a3, a4 = st.columns(4)
+            a1, a2, a3, a4, a5 = st.columns(5)
             with a1:
+                if c['status'] == 'draft' and st.button("📧 Test Email", key=f"test_{c['id']}", help="Send a test email to yourself"):
+                    st.session_state[f"send_test_{c['id']}"] = True
+            with a2:
                 if c['status'] == 'draft' and st.button("🚀 Send Campaign", key=f"send_{c['id']}"):
                     st.session_state[f"confirm_send_{c['id']}"] = True
-            with a2:
+            with a3:
                 if c['status'] == 'draft' and st.button("✏️ Edit", key=f"edit_{c['id']}"):
                     st.session_state[f"edit_campaign"] = c['id']
-            with a3:
+            with a4:
                 if c['status'] == 'sent':
                     if st.button("📋 View Sends", key=f"sends_{c['id']}"):
                         st.session_state[f"view_sends"] = c['id']
-            with a4:
+            with a5:
                 if user['role'] == 'admin':
                     with st.popover("🗑 Delete", key=f"del_camp_{c['id']}"):
                         st.caption("Are you sure?")
@@ -169,6 +172,40 @@ def tab_campaigns(user):
                             db.log_audit(user['id'], user['full_name'], "delete", "email_campaign",
                                          entity_id=c['id'], entity_label=c['name'])
                             st.rerun()
+
+            # Send test email
+            if st.session_state.get(f"send_test_{c['id']}"):
+                st.markdown("---")
+                st.info("📧 **Send Test Email**")
+                test_email = st.text_input("Send to:", value=user['email'], key=f"test_email_{c['id']}")
+                col1, col2 = st.columns(2)
+                if col1.button("✓ Send Test", key=f"confirm_test_{c['id']}", type="primary"):
+                    try:
+                        from utils import smtp_connect
+                        unsub_url = f"{BASE_URL}/unsub"
+                        open_pixel_url = f"{BASE_URL}/open/{c['id']}"
+                        wrapped_html = _wrap_html(c['body_html'], c['subject'], c['from_name'], unsub_url, open_pixel_url)
+
+                        conn = smtp_connect()
+                        msg = MIMEMultipart('alternative')
+                        msg['From'] = formataddr((c['from_name'], c['from_email']))
+                        msg['To'] = test_email
+                        msg['Reply-To'] = c['reply_to'] or c['from_email']
+                        msg['Subject'] = f"[TEST] {c['subject']}"
+                        msg.attach(MIMEText(wrapped_html, 'html'))
+
+                        conn.sendmail(c['from_email'], [test_email], msg.as_string())
+                        conn.quit()
+
+                        st.success(f"✅ Test email sent to {test_email}")
+                        st.session_state.pop(f"send_test_{c['id']}", None)
+                        time.sleep(1)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Failed to send test email: {str(e)}")
+                if col2.button("Cancel", key=f"cancel_test_{c['id']}"):
+                    st.session_state.pop(f"send_test_{c['id']}", None)
+                    st.rerun()
 
             # Confirm send
             if st.session_state.get(f"confirm_send_{c['id']}"):
