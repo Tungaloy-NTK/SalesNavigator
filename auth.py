@@ -180,6 +180,7 @@ def login(username: str, password: str):
     return None, f"Invalid username or password. {remaining_attempts} attempt(s) remaining before lockout."
 
 def set_session(user):
+    import hashlib
     st.session_state["user_id"]   = user["id"]
     st.session_state["username"]  = user["username"]
     st.session_state["full_name"] = user["full_name"]
@@ -192,11 +193,24 @@ def set_session(user):
     st.session_state["last_activity"] = datetime.now()
     st.session_state.setdefault("page", "hub")
 
+    # Create and store session token for persistence across page refreshes
+    import secrets
+    session_token = secrets.token_urlsafe(32)
+    with db.get_conn() as conn:
+        conn.execute("UPDATE users SET session_token=? WHERE id=?", (session_token, user["id"]))
+
+    # Store token in URL query params for persistence
+    st.query_params["session_token"] = session_token
+    st.query_params["user_id"] = str(user["id"])
+
 def logout():
     for key in ["user_id","username","full_name","role","email","sm_names",
                 "regional_manager_id","logged_in","page","selected_customer",
                 "selected_test_request","selected_lead","last_activity"]:
         st.session_state.pop(key, None)
+
+    # Clear session token from URL
+    st.query_params.clear()
 
 
 def check_session_timeout() -> bool:
@@ -215,7 +229,33 @@ def check_session_timeout() -> bool:
     return True
 
 def is_logged_in():
-    return st.session_state.get("logged_in", False)
+    # Check if already logged in via session state
+    if st.session_state.get("logged_in", False):
+        return True
+
+    # Check if we can restore session from query params (after page refresh)
+    if st.query_params.get("session_token"):
+        token = st.query_params.get("session_token")
+        user_id = st.query_params.get("user_id")
+        try:
+            user_id = int(user_id)
+            user = db.get_user_by_id(user_id)
+            if user and user.get("session_token") == token:
+                # Restore session
+                st.session_state["logged_in"] = True
+                st.session_state["user_id"] = user["id"]
+                st.session_state["username"] = user["username"]
+                st.session_state["full_name"] = user["full_name"]
+                st.session_state["role"] = user["role"]
+                st.session_state["email"] = user["email"]
+                st.session_state["sm_names"] = [s.strip() for s in user.get("sm_names", "").split(",") if s.strip()]
+                st.session_state["regional_manager_id"] = user.get("regional_manager_id")
+                st.session_state["last_activity"] = datetime.now()
+                return True
+        except:
+            pass
+
+    return False
 
 def current_role():
     return st.session_state.get("role", "")

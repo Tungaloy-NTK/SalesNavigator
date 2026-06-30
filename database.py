@@ -565,6 +565,8 @@ def init_db():
             ("failed_login_attempts", "INTEGER DEFAULT 0"),
             ("locked_until",          "TEXT"),
             ("password_changed_at",   "TEXT"),
+            ("session_token",         "TEXT"),
+            ("must_change_password",  "INTEGER DEFAULT 0"),
         ]:
             if col not in existing_users:
                 conn.execute(f"ALTER TABLE users ADD COLUMN {col} {typedef}")
