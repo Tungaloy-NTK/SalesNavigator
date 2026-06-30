@@ -1528,21 +1528,68 @@ def page_upload():
     with tab_cust:
         st.markdown("""
         Upload your **Customer Info** spreadsheet to enrich account records with:
+        - **Customer** — customer code/number
         - **Post Area** — postcode area prefix (e.g. G, S, CV)
-        - **Main Distributor** — primary distributor for this account
-        - **Region** — UK region (e.g. Scotland, West Midlands)
-        - **Customer Type** — End user or Distributor
+        - **Region** — UK region (e.g. Scotland, West Midlands, North)
+        - **Customer Type** — End User, Distributor, OEM, etc.
 
         The file must have a **Customer** column containing the customer number.
         Only customers already in the system will be updated; unknown numbers are skipped.
         """)
 
-        cust_file = st.file_uploader(
-            "Choose Customer Info (.xlsx)",
-            type=["xlsx"],
-            key="cust_info_upload",
-            help="Upload the customer info spreadsheet — e.g. 'Customer info 09.04.26.xlsx'"
-        )
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            cust_file = st.file_uploader(
+                "Choose Customer Info (.xlsx)",
+                type=["xlsx"],
+                key="cust_info_upload",
+                help="Upload the customer info spreadsheet — e.g. 'Customer info 30.06.26.xlsx'"
+            )
+        with col2:
+            if st.button("📥 Download Template", key="download_template"):
+                st.session_state["download_template"] = True
+
+        if st.session_state.get("download_template"):
+            import io
+            from openpyxl import Workbook
+            from openpyxl.styles import Font, PatternFill, Alignment
+
+            wb = Workbook()
+            sheet = wb.active
+            sheet.title = "Customer Info"
+
+            headers = ["Customer", "Post Area", "Region", "Customer Type"]
+            for col_num, header in enumerate(headers, 1):
+                cell = sheet.cell(row=1, column=col_num)
+                cell.value = header
+                cell.font = Font(bold=True, color="FFFFFF")
+                cell.fill = PatternFill(start_color="1a1a2e", end_color="1a1a2e", fill_type="solid")
+                cell.alignment = Alignment(horizontal="center")
+
+            example_data = [
+                [887, "G", "Scotland", "End User"],
+                [511, "S", "Scotland", "Distributor"],
+                [228, "CV", "West Midlands", "End User"],
+            ]
+            for row_num, row_data in enumerate(example_data, 2):
+                for col_num, value in enumerate(row_data, 1):
+                    sheet.cell(row=row_num, column=col_num).value = value
+
+            for col_num in range(1, len(headers) + 1):
+                sheet.column_dimensions[chr(64 + col_num)].width = 18
+
+            buffer = io.BytesIO()
+            wb.save(buffer)
+            buffer.seek(0)
+
+            st.download_button(
+                label="⬇️ Download Template.xlsx",
+                data=buffer.getvalue(),
+                file_name="Customer_Info_Template.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="template_download"
+            )
+            st.session_state["download_template"] = False
 
         if cust_file:
             with st.spinner("Reading file…"):
