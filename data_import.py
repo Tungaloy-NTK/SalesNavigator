@@ -308,17 +308,20 @@ def parse_customer_info(file_obj):
 
 def import_customer_info(df):
     """
-    Upsert customer info rows (post_area, main_distributor, region, customer_type)
-    into the customers table, matching on customer_code.
+    Upsert customer info rows into the customers table, matching on customer_code.
     Only updates customers that already exist; skips unknown codes.
     Returns dict with counts.
     """
     updated = 0
     skipped = 0
 
-    update_cols = [c for c in ["post_area", "main_distributor", "region", "customer_type", "city", "salesman_name"] if c in df.columns]
-
     with db.get_conn() as conn:
+        # Check which columns exist in the customers table
+        existing_cols = [r["name"] for r in conn.execute("PRAGMA table_info(customers)").fetchall()]
+        # Only update columns that exist in both the dataframe and the database
+        update_cols = [c for c in ["post_area", "main_distributor", "region", "customer_type", "city", "salesman_name"]
+                      if c in df.columns and c in existing_cols]
+
         for _, row in df.iterrows():
             code = row["customer_code"]
             existing = conn.execute(
@@ -330,13 +333,19 @@ def import_customer_info(df):
                 continue
 
             set_clause = ", ".join(f"{c}=?" for c in update_cols)
-            values = [row[c] if row[c] != "" else None for c in update_cols]
+            values = [row[c] if pd.notna(row[c]) and row[c] != "" else None for c in update_cols]
             values.append(code)
-            conn.execute(
-                f"UPDATE customers SET {set_clause} WHERE customer_code=?",
-                values
-            )
-            updated += 1
+
+            try:
+                conn.execute(
+                    f"UPDATE customers SET {set_clause} WHERE customer_code=?",
+                    values
+                )
+                updated += 1
+            except Exception as e:
+                # Log error but continue with other records
+                print(f"Error updating customer {code}: {e}")
+                skipped += 1
 
     return {"updated": updated, "skipped": skipped}
 
