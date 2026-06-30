@@ -635,14 +635,117 @@ def _starter_landing_page():
 </div>"""
 
 
+# ── Tab 6: Segments ───────────────────────────────────────────────────────────
+
+def tab_segments(user):
+    st.markdown("### 👥 Customer Segments")
+    st.caption("Create and manage customer segments for targeted campaigns")
+
+    col1, col2 = st.columns([3, 1])
+    with col2:
+        if st.button("➕ New Segment", type="primary"):
+            st.session_state["show_segment_form"] = True
+
+    segments = db.crm_get_segments()
+
+    if st.session_state.get("show_segment_form"):
+        st.markdown("---")
+        st.markdown("#### Create New Segment")
+        with st.form("new_segment_form"):
+            seg_name = st.text_input("Segment Name *", placeholder="e.g. Active Stainless Steel Users")
+            seg_desc = st.text_area("Description (optional)", placeholder="Notes about this segment")
+
+            st.markdown("**Filter Customers By:**")
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+                filter_sm = col1.multiselect(
+                    "Sales Manager",
+                    options=[""] + sorted(list(set(r["sm_name"] for r in db.get_all_customers() if r.get("sm_name")))),
+                    default=[]
+                )
+
+            with col2:
+                industries = sorted(list(set(r.get("industry", "") for r in db.get_all_customers() if r.get("industry"))))
+                filter_industry = col2.multiselect(
+                    "Industry",
+                    options=industries,
+                    default=[]
+                )
+
+            with col3:
+                regions = ["North", "South", "East", "West", "Scotland"]
+                filter_region = col3.multiselect(
+                    "Region",
+                    options=regions,
+                    default=[]
+                )
+
+            col1, col2 = st.columns(2)
+            with col1:
+                last_order_months = col1.slider("Last Order (months ago)", 0, 36, 12)
+
+            if st.form_submit_button("Create Segment", type="primary"):
+                if not seg_name.strip():
+                    st.error("Segment name is required")
+                    return
+
+                import json
+                filter_json = json.dumps({
+                    "sm_names": filter_sm,
+                    "industries": filter_industry,
+                    "regions": filter_region,
+                    "last_order_months": last_order_months
+                })
+
+                db.crm_save_segment(seg_name.strip(), seg_desc or None, user["id"], filter_json=filter_json, create_from_filters=True)
+                st.success(f"✅ Segment '{seg_name.strip()}' created!")
+                st.session_state["show_segment_form"] = False
+                st.rerun()
+
+        st.markdown("---")
+
+    if not segments:
+        st.info("No segments yet. Click '+ New Segment' to create one.")
+        return
+
+    for seg in segments:
+        members = db.crm_get_segment_members(seg["id"])
+        member_count = len(members) if members else 0
+
+        with st.expander(f"**{seg['name']}** — {member_count} customers"):
+            col1, col2, col3 = st.columns([2, 1, 1])
+
+            with col1:
+                st.caption(f"**Description:** {seg['description'] or 'N/A'}")
+                if seg["filter_json"]:
+                    try:
+                        import json
+                        filters = json.loads(seg["filter_json"])
+                        st.caption(f"**Filters:** Sales Mgrs: {', '.join(filters.get('sm_names', [])) or 'All'} | Industries: {', '.join(filters.get('industries', [])) or 'All'}")
+                    except:
+                        pass
+                st.caption(f"Created: {_fmt_dt(seg['created_at'])}")
+
+            with col2:
+                st.metric("Members", f"{member_count:,}")
+
+            with col3:
+                if st.button("🗑️ Delete", key=f"del_seg_{seg['id']}", use_container_width=True):
+                    db.crm_delete_segment(seg["id"])
+                    st.success("Segment deleted")
+                    st.rerun()
+
+
 # ── Main entry point ──────────────────────────────────────────────────────────
 
 def render_page(user):
     st.title("📧 Email Campaigns")
 
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "📧 Campaigns",
         "📄 Templates",
+        "👥 Segments",
         "📊 Analytics",
         "🚫 Opt-outs",
         "🌐 Landing Pages",
@@ -650,6 +753,7 @@ def render_page(user):
 
     with tab1: tab_campaigns(user)
     with tab2: tab_templates(user)
-    with tab3: tab_analytics(user)
-    with tab4: tab_optouts(user)
-    with tab5: tab_landing_pages(user)
+    with tab3: tab_segments(user)
+    with tab4: tab_analytics(user)
+    with tab5: tab_optouts(user)
+    with tab6: tab_landing_pages(user)

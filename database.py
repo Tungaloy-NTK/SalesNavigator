@@ -2332,19 +2332,36 @@ def crm_get_segments():
             ORDER BY s.created_at DESC
         """).fetchall()
 
-def crm_save_segment(name, description=None, created_by=None, customer_codes=None, segment_id=None):
+def crm_save_segment(name, description=None, created_by=None, customer_codes=None, segment_id=None, filter_json=None, create_from_filters=False):
     with get_conn() as conn:
         if segment_id:
             conn.execute("""
-                UPDATE crm_segments SET name=?, description=?, updated_at=? WHERE id=?
-            """, (name, description, _now(), segment_id))
+                UPDATE crm_segments SET name=?, description=?, filter_json=?, updated_at=? WHERE id=?
+            """, (name, description, filter_json, _now(), segment_id))
         else:
             cur = conn.execute("""
-                INSERT INTO crm_segments (name, description, created_by, created_at, updated_at)
-                VALUES (?,?,?,?,?)
-            """, (name, description, created_by, _now(), _now()))
+                INSERT INTO crm_segments (name, description, filter_json, created_by, created_at, updated_at)
+                VALUES (?,?,?,?,?,?)
+            """, (name, description, filter_json, created_by, _now(), _now()))
             segment_id = cur.lastrowid
-        if customer_codes is not None:
+
+        if create_from_filters and filter_json:
+            import json
+            conn.execute("DELETE FROM crm_segment_members WHERE segment_id=?", (segment_id,))
+            filters = json.loads(filter_json)
+            all_customers = get_all_customers()
+            for cust in all_customers:
+                match = True
+                if filters.get("sm_names") and cust.get("sm_name") not in filters["sm_names"]:
+                    match = False
+                if filters.get("industries") and cust.get("industry") not in filters["industries"]:
+                    match = False
+                if match:
+                    conn.execute("""
+                        INSERT OR IGNORE INTO crm_segment_members (segment_id, customer_code, added_at)
+                        VALUES (?,?,?)
+                    """, (segment_id, cust.get("customer_code"), _now()))
+        elif customer_codes is not None:
             conn.execute("DELETE FROM crm_segment_members WHERE segment_id=?", (segment_id,))
             for code in customer_codes:
                 conn.execute("""
