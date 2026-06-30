@@ -689,101 +689,50 @@ def tab_segments(user):
         st.markdown("---")
         st.markdown("#### Create New Segment")
 
-        # Debug: Show what data exists
-        with st.expander("🔍 Debug Info", expanded=False):
-            try:
-                with db.get_conn() as conn:
-                    total = conn.execute("SELECT COUNT(*) as c FROM customers").fetchone()
-                    st.write(f"Total customers: {total['c'] if hasattr(total, '__getitem__') else 'N/A'}")
+        # Load all customers BEFORE form
+        with db.get_conn() as conn:
+            all_customers = conn.execute(
+                "SELECT id, customer_code, customer_name FROM customers ORDER BY customer_name"
+            ).fetchall()
 
-                    sm_count = conn.execute("SELECT COUNT(*) as c FROM customers WHERE salesman_name IS NOT NULL AND salesman_name != ''").fetchone()
-                    st.write(f"With salesman_name: {sm_count['c'] if hasattr(sm_count, '__getitem__') else 'N/A'}")
-
-                    ct_count = conn.execute("SELECT COUNT(*) as c FROM customers WHERE customer_type IS NOT NULL AND customer_type != ''").fetchone()
-                    st.write(f"With customer_type: {ct_count['c'] if hasattr(ct_count, '__getitem__') else 'N/A'}")
-
-                    r_count = conn.execute("SELECT COUNT(*) as c FROM customers WHERE region IS NOT NULL AND region != ''").fetchone()
-                    st.write(f"With region: {r_count['c'] if hasattr(r_count, '__getitem__') else 'N/A'}")
-            except Exception as e:
-                st.write(f"Debug error: {e}")
-
-        # Get distinct values from database BEFORE form (so form renders cleanly)
-        sm_names = []
-        cust_types = []
-        regions = []
-        try:
-            with db.get_conn() as conn:
-                try:
-                    sm_names = sorted([r[0] for r in conn.execute(
-                        "SELECT DISTINCT salesman_name FROM customers WHERE salesman_name IS NOT NULL AND salesman_name != '' ORDER BY salesman_name"
-                    ).fetchall()])
-                except Exception as e:
-                    st.warning(f"Could not load Sales Managers: {e}")
-                try:
-                    cust_types = sorted([r[0] for r in conn.execute(
-                        "SELECT DISTINCT customer_type FROM customers WHERE customer_type IS NOT NULL AND customer_type != '' ORDER BY customer_type"
-                    ).fetchall()])
-                except Exception as e:
-                    st.warning(f"Could not load Customer Types: {e}")
-                try:
-                    regions = sorted([r[0] for r in conn.execute(
-                        "SELECT DISTINCT region FROM customers WHERE region IS NOT NULL AND region != '' ORDER BY region"
-                    ).fetchall()])
-                except Exception as e:
-                    st.warning(f"Could not load Regions: {e}")
-        except Exception as e:
-            st.warning(f"Database error: {e}")
+        customer_options = [f"{c['customer_code']} - {c['customer_name']}" for c in all_customers]
+        customer_map = {opt: c["id"] for opt, c in zip(customer_options, all_customers)}
 
         with st.form("new_segment_form"):
             seg_name = st.text_input("Segment Name *", placeholder="e.g. Active Stainless Steel Users")
-            seg_desc = st.text_area("Description (optional)", placeholder="Notes about this segment")
+            seg_desc = st.text_area("Description (optional)", placeholder="Notes about this segment", height=2)
 
-            st.markdown("**Filter Customers By:**")
-            col1, col2, col3 = st.columns(3)
+            st.markdown("**Select Customers:**")
+            st.caption(f"Total available: {len(all_customers)} customers")
 
-            with col1:
-                filter_sm = col1.multiselect(
-                    "Sales Manager",
-                    options=sm_names,
-                    default=[]
-                )
+            selected_customers = st.multiselect(
+                "Choose customers for this segment",
+                options=customer_options,
+                default=[]
+            )
 
-            with col2:
-                filter_cust_type = col2.multiselect(
-                    "Customer Type",
-                    options=cust_types,
-                    default=[]
-                )
-
-            with col3:
-                filter_region = col3.multiselect(
-                    "Region",
-                    options=regions,
-                    default=[]
-                )
-
-            st.markdown("---")
-            col1, col2 = st.columns(2)
-            with col1:
-                last_order_months = col1.slider("Last Order (months ago)", 0, 36, 12)
+            if selected_customers:
+                st.info(f"✓ {len(selected_customers)} customers selected")
 
             if st.form_submit_button("Create Segment", type="primary"):
                 if not seg_name.strip():
                     st.error("Segment name is required")
-                    return
-
-                import json
-                filter_json = json.dumps({
-                    "sm_names": filter_sm,
-                    "customer_types": filter_cust_type,
-                    "regions": filter_region,
-                    "last_order_months": last_order_months
-                })
-
-                db.crm_save_segment(seg_name.strip(), seg_desc or None, user["id"], filter_json=filter_json, create_from_filters=True)
-                st.success(f"✅ Segment '{seg_name.strip()}' created!")
-                st.session_state["show_segment_form"] = False
-                st.rerun()
+                elif not selected_customers:
+                    st.error("Select at least one customer")
+                else:
+                    # Save segment with selected customer IDs
+                    selected_ids = [customer_map[opt] for opt in selected_customers]
+                    import json
+                    db.crm_save_segment(
+                        seg_name.strip(),
+                        seg_desc.strip() or None,
+                        user["id"],
+                        filter_json=json.dumps({"customer_ids": selected_ids}),
+                        create_from_filters=True
+                    )
+                    st.success(f"✅ Segment '{seg_name.strip()}' created with {len(selected_customers)} customers!")
+                    st.session_state["show_segment_form"] = False
+                    st.rerun()
 
         st.markdown("---")
 
