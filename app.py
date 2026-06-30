@@ -1546,10 +1546,6 @@ def page_upload():
                 help="Upload the customer info spreadsheet — e.g. 'Customer info 30.06.26.xlsx'"
             )
         with col2:
-            if st.button("📥 Download Template", key="download_template"):
-                st.session_state["download_template"] = True
-
-        if st.session_state.get("download_template"):
             import io
             from openpyxl import Workbook
             from openpyxl.styles import Font, PatternFill, Alignment
@@ -1583,13 +1579,12 @@ def page_upload():
             buffer.seek(0)
 
             st.download_button(
-                label="⬇️ Download Template.xlsx",
+                label="📥 Download Template",
                 data=buffer.getvalue(),
                 file_name="Customer_Info_Template.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key="template_download"
             )
-            st.session_state["download_template"] = False
 
         if cust_file:
             with st.spinner("Reading file…"):
