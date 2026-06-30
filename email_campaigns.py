@@ -689,6 +689,21 @@ def tab_segments(user):
         st.markdown("---")
         st.markdown("#### Create New Segment")
 
+        # Debug: Show what data exists
+        with st.expander("🔍 Debug Info", expanded=False):
+            with db.get_conn() as conn:
+                total = conn.execute("SELECT COUNT(*) as c FROM customers").fetchone()
+                st.write(f"Total customers: {total[0]}")
+
+                sm_count = conn.execute("SELECT COUNT(*) as c FROM customers WHERE salesman_name IS NOT NULL AND salesman_name != ''").fetchone()
+                st.write(f"With salesman_name: {sm_count[0]}")
+
+                ct_count = conn.execute("SELECT COUNT(*) as c FROM customers WHERE customer_type IS NOT NULL AND customer_type != ''").fetchone()
+                st.write(f"With customer_type: {ct_count[0]}")
+
+                r_count = conn.execute("SELECT COUNT(*) as c FROM customers WHERE region IS NOT NULL AND region != ''").fetchone()
+                st.write(f"With region: {r_count[0]}")
+
         # Get distinct values from database BEFORE form (so form renders cleanly)
         sm_names = []
         cust_types = []
@@ -699,22 +714,22 @@ def tab_segments(user):
                     sm_names = sorted([r[0] for r in conn.execute(
                         "SELECT DISTINCT salesman_name FROM customers WHERE salesman_name IS NOT NULL AND salesman_name != '' ORDER BY salesman_name"
                     ).fetchall()])
-                except:
-                    pass
+                except Exception as e:
+                    st.warning(f"Could not load Sales Managers: {e}")
                 try:
                     cust_types = sorted([r[0] for r in conn.execute(
                         "SELECT DISTINCT customer_type FROM customers WHERE customer_type IS NOT NULL AND customer_type != '' ORDER BY customer_type"
                     ).fetchall()])
-                except:
-                    pass
+                except Exception as e:
+                    st.warning(f"Could not load Customer Types: {e}")
                 try:
                     regions = sorted([r[0] for r in conn.execute(
                         "SELECT DISTINCT region FROM customers WHERE region IS NOT NULL AND region != '' ORDER BY region"
                     ).fetchall()])
-                except:
-                    pass
-        except:
-            pass
+                except Exception as e:
+                    st.warning(f"Could not load Regions: {e}")
+        except Exception as e:
+            st.warning(f"Database error: {e}")
 
         with st.form("new_segment_form"):
             seg_name = st.text_input("Segment Name *", placeholder="e.g. Active Stainless Steel Users")
