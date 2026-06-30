@@ -703,10 +703,10 @@ def tab_segments(user):
                 )
 
             with col2:
-                industries = sorted(list(set(r.get("industry", "") for r in db.get_all_customers() if r.get("industry"))))
-                filter_industry = col2.multiselect(
-                    "Industry",
-                    options=industries,
+                customer_types = sorted(list(set(r.get("customer_type", "") for r in db.get_all_customers() if r.get("customer_type"))))
+                filter_cust_type = col2.multiselect(
+                    "Customer Type",
+                    options=customer_types,
                     default=[]
                 )
 
@@ -730,7 +730,7 @@ def tab_segments(user):
                 import json
                 filter_json = json.dumps({
                     "sm_names": filter_sm,
-                    "industries": filter_industry,
+                    "customer_types": filter_cust_type,
                     "regions": filter_region,
                     "last_order_months": last_order_months
                 })
@@ -759,7 +759,7 @@ def tab_segments(user):
                     try:
                         import json
                         filters = json.loads(seg["filter_json"])
-                        st.caption(f"**Filters:** Sales Mgrs: {', '.join(filters.get('sm_names', [])) or 'All'} | Industries: {', '.join(filters.get('industries', [])) or 'All'}")
+                        st.caption(f"**Filters:** Sales Mgrs: {', '.join(filters.get('sm_names', [])) or 'All'} | Customer Types: {', '.join(filters.get('customer_types', [])) or 'All'}")
                     except:
                         pass
                 st.caption(f"Created: {_fmt_dt(seg['created_at'])}")

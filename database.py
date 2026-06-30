@@ -2356,7 +2356,7 @@ def crm_save_segment(name, description=None, created_by=None, customer_codes=Non
                 match = True
                 if filters.get("sm_names") and cust.get("sm_name") not in filters["sm_names"]:
                     match = False
-                if filters.get("industries") and cust.get("industry") not in filters["industries"]:
+                if filters.get("customer_types") and cust.get("customer_type") not in filters["customer_types"]:
                     match = False
                 if match:
                     conn.execute("""
