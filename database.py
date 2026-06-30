@@ -468,7 +468,10 @@ def init_db():
             ("salesman_name",    "TEXT"),
         ]:
             if col not in existing_cust:
-                conn.execute(f"ALTER TABLE customers ADD COLUMN {col} {typedef}")
+                try:
+                    conn.execute(f"ALTER TABLE customers ADD COLUMN {col} {typedef}")
+                except Exception as e:
+                    print(f"Could not add {col} to customers: {e}")
 
         # Add new columns to test_tool_requests if they don't exist yet
         existing = [r["name"] for r in conn.execute("PRAGMA table_info(test_tool_requests)").fetchall()]
