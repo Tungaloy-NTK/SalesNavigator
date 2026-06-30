@@ -695,28 +695,60 @@ def tab_segments(user):
             st.markdown("**Filter Customers By:**")
             col1, col2, col3 = st.columns(3)
 
+            # Get distinct values from database
+            with db.get_conn() as conn:
+                sm_names = sorted([r["salesman_name"] for r in conn.execute(
+                    "SELECT DISTINCT salesman_name FROM customers WHERE salesman_name IS NOT NULL AND salesman_name != '' ORDER BY salesman_name"
+                ).fetchall()])
+                cust_types = sorted([r["customer_type"] for r in conn.execute(
+                    "SELECT DISTINCT customer_type FROM customers WHERE customer_type IS NOT NULL AND customer_type != '' ORDER BY customer_type"
+                ).fetchall()])
+                regions = sorted([r["region"] for r in conn.execute(
+                    "SELECT DISTINCT region FROM customers WHERE region IS NOT NULL AND region != '' ORDER BY region"
+                ).fetchall()])
+
             with col1:
                 filter_sm = col1.multiselect(
                     "Sales Manager",
-                    options=[""] + sorted(list(set(r["sm_name"] for r in db.get_all_customers() if r.get("sm_name")))),
+                    options=sm_names,
                     default=[]
                 )
 
             with col2:
-                customer_types = sorted(list(set(r.get("customer_type", "") for r in db.get_all_customers() if r.get("customer_type"))))
                 filter_cust_type = col2.multiselect(
                     "Customer Type",
-                    options=customer_types,
+                    options=cust_types,
                     default=[]
                 )
 
             with col3:
-                regions = ["North", "South", "East", "West", "Scotland"]
                 filter_region = col3.multiselect(
                     "Region",
                     options=regions,
                     default=[]
                 )
+
+            # Display matching customer count
+            st.markdown("---")
+            with db.get_conn() as conn:
+                query = "SELECT COUNT(*) as count FROM customers WHERE 1=1"
+                params = []
+                if filter_sm:
+                    placeholders = ",".join("?" * len(filter_sm))
+                    query += f" AND salesman_name IN ({placeholders})"
+                    params.extend(filter_sm)
+                if filter_cust_type:
+                    placeholders = ",".join("?" * len(filter_cust_type))
+                    query += f" AND customer_type IN ({placeholders})"
+                    params.extend(filter_cust_type)
+                if filter_region:
+                    placeholders = ",".join("?" * len(filter_region))
+                    query += f" AND region IN ({placeholders})"
+                    params.extend(filter_region)
+
+                count_result = conn.execute(query, params).fetchone()
+                matching_count = count_result["count"] if count_result else 0
+                st.metric("Matching Customers", f"{matching_count:,}")
 
             col1, col2 = st.columns(2)
             with col1:
