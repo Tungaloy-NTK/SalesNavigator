@@ -366,19 +366,19 @@ def sync_ac_contacts_to_db(progress_callback=None):
                         skipped_unsub += 1
                         continue
 
-                    # Extract all available fields
-                    first_name = ac_contact.get("firstName", "").strip()
-                    last_name = ac_contact.get("lastName", "").strip()
+                    # Extract all available fields (handle None values)
+                    first_name = (ac_contact.get("firstName") or "").strip()
+                    last_name = (ac_contact.get("lastName") or "").strip()
                     full_name = f"{first_name} {last_name}".strip()
-                    company = ac_contact.get("organization", "").strip() or ac_contact.get("company", "").strip()
-                    phone = ac_contact.get("phone", "").strip()
-                    address = ac_contact.get("address", "").strip()
-                    city = ac_contact.get("city", "").strip()
-                    state = ac_contact.get("state", "").strip()
-                    postal_code = ac_contact.get("zipcode", "").strip() or ac_contact.get("postal_code", "").strip()
-                    country = ac_contact.get("country", "").strip()
-                    notes = ac_contact.get("notes", "").strip()
-                    ac_id = ac_contact.get("id", "")
+                    company = ((ac_contact.get("organization") or "") or (ac_contact.get("company") or "")).strip()
+                    phone = (ac_contact.get("phone") or "").strip()
+                    address = (ac_contact.get("address") or "").strip()
+                    city = (ac_contact.get("city") or "").strip()
+                    state = (ac_contact.get("state") or "").strip()
+                    postal_code = ((ac_contact.get("zipcode") or "") or (ac_contact.get("postal_code") or "")).strip()
+                    country = (ac_contact.get("country") or "").strip()
+                    notes = (ac_contact.get("notes") or "").strip()
+                    ac_id = ac_contact.get("id") or ""
 
                     # Insert or update contact in database with all fields
                     conn.execute("""
