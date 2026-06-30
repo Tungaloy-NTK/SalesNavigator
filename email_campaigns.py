@@ -775,6 +775,7 @@ def tab_segments(user):
 
 
 # ── Main entry point ──────────────────────────────────────────────────────────
+# Updated: Segments tab added
 
 def render_page(user):
     st.title("📧 Email Campaigns")
