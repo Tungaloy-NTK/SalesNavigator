@@ -281,10 +281,14 @@ def parse_customer_info(file_obj):
     # Normalise column names
     col_map = {
         "Customer":          "customer_code",
+        "Customer Code":     "customer_code",
         "Post Area":         "post_area",
         "Main Distributors": "main_distributor",
         "Region":            "region",
         "Customer Type":     "customer_type",
+        "City":              "city",
+        "Salesman Name":     "salesman_name",
+        "SALESMAN_NAME":     "salesman_name",
     }
     col_map_lower = {k.lower(): v for k, v in col_map.items()}
     rename = {c: col_map_lower[c.lower().strip()] for c in df.columns if c.lower().strip() in col_map_lower}
@@ -312,7 +316,7 @@ def import_customer_info(df):
     updated = 0
     skipped = 0
 
-    update_cols = [c for c in ["post_area", "main_distributor", "region", "customer_type"] if c in df.columns]
+    update_cols = [c for c in ["post_area", "main_distributor", "region", "customer_type", "city", "salesman_name"] if c in df.columns]
 
     with db.get_conn() as conn:
         for _, row in df.iterrows():

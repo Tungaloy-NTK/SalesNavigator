@@ -464,6 +464,8 @@ def init_db():
             ("region",           "TEXT"),
             ("email",            "TEXT"),
             ("customer_type",    "TEXT"),
+            ("city",             "TEXT"),
+            ("salesman_name",    "TEXT"),
         ]:
             if col not in existing_cust:
                 conn.execute(f"ALTER TABLE customers ADD COLUMN {col} {typedef}")

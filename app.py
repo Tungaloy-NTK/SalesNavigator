@@ -1554,7 +1554,7 @@ def page_upload():
             sheet = wb.active
             sheet.title = "Customer Info"
 
-            headers = ["Customer", "Post Area", "Region", "Customer Type"]
+            headers = ["Customer Code", "Customer Type", "Post Area", "Region", "City", "Salesman Name"]
             for col_num, header in enumerate(headers, 1):
                 cell = sheet.cell(row=1, column=col_num)
                 cell.value = header
@@ -1563,16 +1563,16 @@ def page_upload():
                 cell.alignment = Alignment(horizontal="center")
 
             example_data = [
-                [887, "G", "Scotland", "End User"],
-                [511, "S", "Scotland", "Distributor"],
-                [228, "CV", "West Midlands", "End User"],
+                [887, "End User", "G", "Scotland", "Glasgow", "SCOTLAND-W-HAMILTON"],
+                [511, "Distributor", "S", "Scotland", "Edinburgh", "SCOTLAND-W-HAMILTON"],
+                [228, "End User", "CV", "West Midlands", "Coventry", "TURNOCK-WMIDS"],
             ]
             for row_num, row_data in enumerate(example_data, 2):
                 for col_num, value in enumerate(row_data, 1):
                     sheet.cell(row=row_num, column=col_num).value = value
 
             for col_num in range(1, len(headers) + 1):
-                sheet.column_dimensions[chr(64 + col_num)].width = 18
+                sheet.column_dimensions[chr(64 + col_num)].width = 20
 
             buffer = io.BytesIO()
             wb.save(buffer)
