@@ -728,28 +728,7 @@ def tab_segments(user):
                     default=[]
                 )
 
-            # Display matching customer count
             st.markdown("---")
-            with db.get_conn() as conn:
-                query = "SELECT COUNT(*) as count FROM customers WHERE 1=1"
-                params = []
-                if filter_sm:
-                    placeholders = ",".join("?" * len(filter_sm))
-                    query += f" AND salesman_name IN ({placeholders})"
-                    params.extend(filter_sm)
-                if filter_cust_type:
-                    placeholders = ",".join("?" * len(filter_cust_type))
-                    query += f" AND customer_type IN ({placeholders})"
-                    params.extend(filter_cust_type)
-                if filter_region:
-                    placeholders = ",".join("?" * len(filter_region))
-                    query += f" AND region IN ({placeholders})"
-                    params.extend(filter_region)
-
-                count_result = conn.execute(query, params).fetchone()
-                matching_count = count_result["count"] if count_result else 0
-                st.metric("Matching Customers", f"{matching_count:,}")
-
             col1, col2 = st.columns(2)
             with col1:
                 last_order_months = col1.slider("Last Order (months ago)", 0, 36, 12)
