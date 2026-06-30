@@ -688,24 +688,40 @@ def tab_segments(user):
     if st.session_state.get("show_segment_form"):
         st.markdown("---")
         st.markdown("#### Create New Segment")
+
+        # Get distinct values from database BEFORE form (so form renders cleanly)
+        sm_names = []
+        cust_types = []
+        regions = []
+        try:
+            with db.get_conn() as conn:
+                try:
+                    sm_names = sorted([r[0] for r in conn.execute(
+                        "SELECT DISTINCT salesman_name FROM customers WHERE salesman_name IS NOT NULL AND salesman_name != '' ORDER BY salesman_name"
+                    ).fetchall()])
+                except:
+                    pass
+                try:
+                    cust_types = sorted([r[0] for r in conn.execute(
+                        "SELECT DISTINCT customer_type FROM customers WHERE customer_type IS NOT NULL AND customer_type != '' ORDER BY customer_type"
+                    ).fetchall()])
+                except:
+                    pass
+                try:
+                    regions = sorted([r[0] for r in conn.execute(
+                        "SELECT DISTINCT region FROM customers WHERE region IS NOT NULL AND region != '' ORDER BY region"
+                    ).fetchall()])
+                except:
+                    pass
+        except:
+            pass
+
         with st.form("new_segment_form"):
             seg_name = st.text_input("Segment Name *", placeholder="e.g. Active Stainless Steel Users")
             seg_desc = st.text_area("Description (optional)", placeholder="Notes about this segment")
 
             st.markdown("**Filter Customers By:**")
             col1, col2, col3 = st.columns(3)
-
-            # Get distinct values from database
-            with db.get_conn() as conn:
-                sm_names = sorted([r["salesman_name"] for r in conn.execute(
-                    "SELECT DISTINCT salesman_name FROM customers WHERE salesman_name IS NOT NULL AND salesman_name != '' ORDER BY salesman_name"
-                ).fetchall()])
-                cust_types = sorted([r["customer_type"] for r in conn.execute(
-                    "SELECT DISTINCT customer_type FROM customers WHERE customer_type IS NOT NULL AND customer_type != '' ORDER BY customer_type"
-                ).fetchall()])
-                regions = sorted([r["region"] for r in conn.execute(
-                    "SELECT DISTINCT region FROM customers WHERE region IS NOT NULL AND region != '' ORDER BY region"
-                ).fetchall()])
 
             with col1:
                 filter_sm = col1.multiselect(
