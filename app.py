@@ -1466,7 +1466,7 @@ def page_team():
 def page_upload():
     st.markdown('<div class="section-header">Upload Data</div>', unsafe_allow_html=True)
 
-    tab_gp, tab_cust, tab_item = st.tabs(["📊 GP Report", "🏢 Customer Info", "🔩 Item Info"])
+    tab_gp, tab_cust, tab_item, tab_download = st.tabs(["📊 GP Report", "🏢 Customer Info", "🔩 Item Info", "📥 Download & Verify"])
 
     # ── GP Report tab ──────────────────────────────────────────────────────────
     with tab_gp:
@@ -1647,6 +1647,107 @@ def page_upload():
                     f"Done! **{result['inserted']} new items added**, "
                     f"**{result['updated']} existing items updated**."
                 )
+
+    # ── Download & Verify tab ──────────────────────────────────────────────────────
+    with tab_download:
+        st.markdown("### Download & Verify Customer Data")
+        st.markdown("""
+        Download all customer data from the system to verify accuracy, then upload corrected data back.
+        This helps ensure your customer information is always up-to-date and correct.
+        """)
+
+        col1, col2 = st.columns(2)
+
+        # ── Download section ──
+        with col1:
+            st.markdown("#### 📥 Download All Customers")
+            if st.button("⬇️ Download as Excel", type="primary", use_container_width=True):
+                with st.spinner("Preparing export…"):
+                    import pandas as pd
+                    import io
+                    from openpyxl import Workbook
+                    from openpyxl.styles import Font, PatternFill, Alignment
+
+                    with db.get_conn() as conn:
+                        customers = conn.execute(
+                            "SELECT id, customer_code, customer_name, sm_name, user_id FROM customers ORDER BY customer_code"
+                        ).fetchall()
+
+                    # Convert to DataFrame
+                    df = pd.DataFrame(customers)
+
+                    # Create Excel file
+                    output = io.BytesIO()
+                    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                        df.to_excel(writer, sheet_name='Customers', index=False)
+
+                        # Format header
+                        workbook = writer.book
+                        worksheet = writer.sheets['Customers']
+                        for cell in worksheet[1]:
+                            cell.font = Font(bold=True, color="FFFFFF")
+                            cell.fill = PatternFill(start_color="1a1a2e", end_color="1a1a2e", fill_type="solid")
+                            cell.alignment = Alignment(horizontal="center")
+
+                        # Auto-adjust column widths
+                        for column in worksheet.columns:
+                            max_length = 0
+                            column_letter = column[0].column_letter
+                            for cell in column:
+                                try:
+                                    if len(str(cell.value)) > max_length:
+                                        max_length = len(str(cell.value))
+                                except:
+                                    pass
+                            worksheet.column_dimensions[column_letter].width = min(max_length + 2, 50)
+
+                    output.seek(0)
+                    st.download_button(
+                        label="📄 Download Complete Data",
+                        data=output.getvalue(),
+                        file_name=f"customer_data_export_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+                    st.success("✅ Export ready! Click the download button above.")
+
+        # ── Upload section ──
+        with col2:
+            st.markdown("#### ⬆️ Upload Corrected Data")
+            st.caption("Upload the Excel file with any corrections or new customer data")
+
+            corrected_file = st.file_uploader(
+                "Choose corrected customer data (.xlsx)",
+                type=["xlsx"],
+                key="customer_data_upload"
+            )
+
+            if corrected_file:
+                with st.spinner("Reading file…"):
+                    try:
+                        import pandas as pd
+                        df_corrected = pd.read_excel(corrected_file)
+                        st.success(f"File read: **{len(df_corrected)} rows**")
+
+                        with st.expander("Preview data"):
+                            st.dataframe(df_corrected.head(10), use_container_width=True)
+
+                        if st.button("✅ Confirm Upload & Update", type="primary", use_container_width=True):
+                            with st.spinner("Updating customer data…"):
+                                # Import the corrected data
+                                result = di.import_customer_info(df_corrected)
+                                st.success(
+                                    f"✅ Update complete! **{result['updated']} customers updated**, "
+                                    f"**{result['skipped']} rows skipped** (not in system)."
+                                )
+                                try:
+                                    db.log_audit(st.session_state["user_id"], st.session_state["full_name"],
+                                                "import", "customer_data",
+                                                entity_label=corrected_file.name,
+                                                details=f"{result['updated']} customers updated")
+                                except:
+                                    pass
+                    except Exception as e:
+                        st.error(f"Error reading file: {e}")
 
 # ── Admin ─────────────────────────────────────────────────────────────────────────
 def page_admin():
