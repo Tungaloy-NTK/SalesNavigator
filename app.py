@@ -1596,7 +1596,7 @@ def page_upload():
 
             st.success(f"File read successfully: **{len(cust_df):,} customer records**")
 
-            preview_cols = [c for c in ["customer_code","post_area","main_distributor","region","customer_type"] if c in cust_df.columns]
+            preview_cols = [c for c in ["customer_code","customer_type","post_area","region","city","salesman_name","main_distributor"] if c in cust_df.columns]
             with st.expander("Preview first 10 rows"):
                 st.dataframe(cust_df[preview_cols].head(10), use_container_width=True, hide_index=True)
 
