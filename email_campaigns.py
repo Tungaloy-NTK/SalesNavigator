@@ -691,18 +691,21 @@ def tab_segments(user):
 
         # Debug: Show what data exists
         with st.expander("🔍 Debug Info", expanded=False):
-            with db.get_conn() as conn:
-                total = conn.execute("SELECT COUNT(*) as c FROM customers").fetchone()
-                st.write(f"Total customers: {total[0]}")
+            try:
+                with db.get_conn() as conn:
+                    total = conn.execute("SELECT COUNT(*) as c FROM customers").fetchone()
+                    st.write(f"Total customers: {total['c'] if hasattr(total, '__getitem__') else 'N/A'}")
 
-                sm_count = conn.execute("SELECT COUNT(*) as c FROM customers WHERE salesman_name IS NOT NULL AND salesman_name != ''").fetchone()
-                st.write(f"With salesman_name: {sm_count[0]}")
+                    sm_count = conn.execute("SELECT COUNT(*) as c FROM customers WHERE salesman_name IS NOT NULL AND salesman_name != ''").fetchone()
+                    st.write(f"With salesman_name: {sm_count['c'] if hasattr(sm_count, '__getitem__') else 'N/A'}")
 
-                ct_count = conn.execute("SELECT COUNT(*) as c FROM customers WHERE customer_type IS NOT NULL AND customer_type != ''").fetchone()
-                st.write(f"With customer_type: {ct_count[0]}")
+                    ct_count = conn.execute("SELECT COUNT(*) as c FROM customers WHERE customer_type IS NOT NULL AND customer_type != ''").fetchone()
+                    st.write(f"With customer_type: {ct_count['c'] if hasattr(ct_count, '__getitem__') else 'N/A'}")
 
-                r_count = conn.execute("SELECT COUNT(*) as c FROM customers WHERE region IS NOT NULL AND region != ''").fetchone()
-                st.write(f"With region: {r_count[0]}")
+                    r_count = conn.execute("SELECT COUNT(*) as c FROM customers WHERE region IS NOT NULL AND region != ''").fetchone()
+                    st.write(f"With region: {r_count['c'] if hasattr(r_count, '__getitem__') else 'N/A'}")
+            except Exception as e:
+                st.write(f"Debug error: {e}")
 
         # Get distinct values from database BEFORE form (so form renders cleanly)
         sm_names = []
