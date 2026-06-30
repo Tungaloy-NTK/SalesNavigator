@@ -228,7 +228,16 @@ def init_db():
                 last_name TEXT,
                 full_name TEXT,
                 company TEXT,
+                phone TEXT,
+                address TEXT,
+                city TEXT,
+                state TEXT,
+                postal_code TEXT,
+                country TEXT,
+                customer_code TEXT,
+                notes TEXT,
                 synced_from_ac INTEGER DEFAULT 0,
+                ac_contact_id TEXT,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT DEFAULT CURRENT_TIMESTAMP
             );

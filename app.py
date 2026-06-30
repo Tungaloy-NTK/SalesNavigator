@@ -1675,29 +1675,21 @@ def page_upload():
                             "SELECT id, customer_code, customer_name, sm_name FROM customers ORDER BY customer_code"
                         ).fetchall()
 
-                        # Get all test request contacts with emails
-                        test_contacts = conn.execute(
-                            "SELECT DISTINCT customer_code, customer_name, contact_name, contact_email FROM test_tool_requests WHERE contact_email IS NOT NULL AND contact_email != '' ORDER BY customer_code"
-                        ).fetchall()
-
-                        # Get all marketing lead contacts with emails
-                        lead_contacts = conn.execute(
-                            "SELECT DISTINCT customer_code, customer_name, contact_name, contact_email FROM marketing_leads WHERE contact_email IS NOT NULL AND contact_email != '' ORDER BY customer_code"
+                        # Get all AC contacts/prospects that were synced
+                        ac_contacts = conn.execute(
+                            "SELECT email, first_name, last_name, full_name, company, phone, address, city, state, postal_code, country, notes FROM customer_contacts ORDER BY full_name"
                         ).fetchall()
 
                     # Convert to DataFrames
                     df_customers = pd.DataFrame(customers)
-                    df_test = pd.DataFrame(test_contacts) if test_contacts else pd.DataFrame(columns=['customer_code', 'customer_name', 'contact_name', 'contact_email'])
-                    df_leads = pd.DataFrame(lead_contacts) if lead_contacts else pd.DataFrame(columns=['customer_code', 'customer_name', 'contact_name', 'contact_email'])
+                    df_ac = pd.DataFrame(ac_contacts) if ac_contacts else pd.DataFrame(columns=['email', 'first_name', 'last_name', 'full_name', 'company', 'phone', 'address', 'city', 'state', 'postal_code', 'country', 'notes'])
 
                     # Create Excel file with multiple sheets
                     output = io.BytesIO()
                     with pd.ExcelWriter(output, engine='openpyxl') as writer:
                         df_customers.to_excel(writer, sheet_name='Customers', index=False)
-                        if not df_test.empty:
-                            df_test.to_excel(writer, sheet_name='Test Contacts', index=False)
-                        if not df_leads.empty:
-                            df_leads.to_excel(writer, sheet_name='Lead Contacts', index=False)
+                        if not df_ac.empty:
+                            df_ac.to_excel(writer, sheet_name='AC Contacts & Prospects', index=False)
 
                         # Format all sheets
                         workbook = writer.book
@@ -1728,15 +1720,15 @@ def page_upload():
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     )
                     st.success(f"✅ Export ready! Includes:")
-                    st.caption(f"• {len(df_customers)} customers\n• {len(df_test)} test request contacts\n• {len(df_leads)} marketing lead contacts")
+                    st.caption(f"• {len(df_customers)} customers\n• {len(df_ac)} Active Campaign contacts & prospects")
 
         # ── Upload section ──
         with col2:
-            st.markdown("#### ⬆️ Upload Corrected Data")
-            st.caption("Upload the Excel file with any corrections or new customer data")
+            st.markdown("#### ⬆️ Upload Cleaned Data")
+            st.caption("Upload the corrected Excel file to update contacts")
 
             corrected_file = st.file_uploader(
-                "Choose corrected customer data (.xlsx)",
+                "Choose cleaned data (.xlsx)",
                 type=["xlsx"],
                 key="customer_data_upload"
             )
@@ -1745,27 +1737,57 @@ def page_upload():
                 with st.spinner("Reading file…"):
                     try:
                         import pandas as pd
-                        df_corrected = pd.read_excel(corrected_file)
-                        st.success(f"File read: **{len(df_corrected)} rows**")
+                        excel_file = pd.ExcelFile(corrected_file)
 
-                        with st.expander("Preview data"):
-                            st.dataframe(df_corrected.head(10), use_container_width=True)
+                        # Show available sheets
+                        st.info(f"Sheets found: {', '.join(excel_file.sheet_names)}")
 
-                        if st.button("✅ Confirm Upload & Update", type="primary", use_container_width=True):
-                            with st.spinner("Updating customer data…"):
-                                # Import the corrected data
-                                result = di.import_customer_info(df_corrected)
-                                st.success(
-                                    f"✅ Update complete! **{result['updated']} customers updated**, "
-                                    f"**{result['skipped']} rows skipped** (not in system)."
-                                )
-                                try:
-                                    db.log_audit(st.session_state["user_id"], st.session_state["full_name"],
-                                                "import", "customer_data",
-                                                entity_label=corrected_file.name,
-                                                details=f"{result['updated']} customers updated")
-                                except:
-                                    pass
+                        # Try to read AC Contacts sheet
+                        if "AC Contacts & Prospects" in excel_file.sheet_names:
+                            df_ac_corrected = pd.read_excel(corrected_file, sheet_name="AC Contacts & Prospects")
+                            st.success(f"AC Contacts file read: **{len(df_ac_corrected)} rows**")
+
+                            with st.expander("Preview AC contact data"):
+                                st.dataframe(df_ac_corrected.head(10), use_container_width=True)
+
+                            if st.button("✅ Confirm Upload AC Contacts", type="primary", use_container_width=True, key="upload_ac"):
+                                with st.spinner("Updating contact data…"):
+                                    imported = 0
+                                    with db.get_conn() as conn:
+                                        for _, row in df_ac_corrected.iterrows():
+                                            email = row.get("email", "").strip()
+                                            if email:
+                                                conn.execute("""
+                                                    INSERT OR REPLACE INTO customer_contacts
+                                                    (email, first_name, last_name, full_name, company, phone, address,
+                                                     city, state, postal_code, country, notes)
+                                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                                """, (
+                                                    email,
+                                                    row.get("first_name", ""),
+                                                    row.get("last_name", ""),
+                                                    row.get("full_name", ""),
+                                                    row.get("company", ""),
+                                                    row.get("phone", ""),
+                                                    row.get("address", ""),
+                                                    row.get("city", ""),
+                                                    row.get("state", ""),
+                                                    row.get("postal_code", ""),
+                                                    row.get("country", ""),
+                                                    row.get("notes", ""),
+                                                ))
+                                                imported += 1
+
+                                    st.success(f"✅ Updated {imported} contacts!")
+                                    try:
+                                        db.log_audit(st.session_state["user_id"], st.session_state["full_name"],
+                                                    "import", "ac_contacts_corrected",
+                                                    entity_label=corrected_file.name,
+                                                    details=f"{imported} AC contacts updated")
+                                    except:
+                                        pass
+                        else:
+                            st.warning("No 'AC Contacts & Prospects' sheet found in file")
                     except Exception as e:
                         st.error(f"Error reading file: {e}")
 

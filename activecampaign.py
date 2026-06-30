@@ -329,7 +329,8 @@ def sync_customers_to_ac(customer_rows, list_id=None, tag_name="Sales Navigator"
 
 def sync_ac_contacts_to_db(progress_callback=None):
     """
-    Pull all contacts AND prospects from Active Campaign (excluding unsubscribed).
+    Pull ALL data from Active Campaign (contacts + prospects, excluding unsubscribed).
+    Extracts: email, name, phone, address, city, state, postal code, country, company, notes.
     Returns (imported_count, skipped_unsubscribed, error_count, errors_list)
     """
     imported = 0
@@ -360,24 +361,33 @@ def sync_ac_contacts_to_db(progress_callback=None):
                         continue
 
                     # Skip unsubscribed contacts
-                    # Check unsubscribe status - AC stores this in the contact record
                     unsub_status = ac_contact.get("unsubscribeStatus", "")
-                    # Also check if contact is marked as deleted/inactive
                     if unsub_status == "2" or ac_contact.get("deleted") == 1:
                         skipped_unsub += 1
                         continue
 
+                    # Extract all available fields
                     first_name = ac_contact.get("firstName", "").strip()
                     last_name = ac_contact.get("lastName", "").strip()
                     full_name = f"{first_name} {last_name}".strip()
                     company = ac_contact.get("organization", "").strip() or ac_contact.get("company", "").strip()
+                    phone = ac_contact.get("phone", "").strip()
+                    address = ac_contact.get("address", "").strip()
+                    city = ac_contact.get("city", "").strip()
+                    state = ac_contact.get("state", "").strip()
+                    postal_code = ac_contact.get("zipcode", "").strip() or ac_contact.get("postal_code", "").strip()
+                    country = ac_contact.get("country", "").strip()
+                    notes = ac_contact.get("notes", "").strip()
+                    ac_id = ac_contact.get("id", "")
 
-                    # Insert or update contact in database
+                    # Insert or update contact in database with all fields
                     conn.execute("""
                         INSERT OR REPLACE INTO customer_contacts
-                        (email, first_name, last_name, full_name, company, synced_from_ac)
-                        VALUES (?, ?, ?, ?, ?, 1)
-                    """, (email, first_name, last_name, full_name, company))
+                        (email, first_name, last_name, full_name, company, phone, address,
+                         city, state, postal_code, country, notes, synced_from_ac, ac_contact_id)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+                    """, (email, first_name, last_name, full_name, company, phone, address,
+                          city, state, postal_code, country, notes, ac_id))
 
                     imported += 1
                     if progress_callback:
