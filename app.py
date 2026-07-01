@@ -296,6 +296,7 @@ def render_sidebar():
             st.rerun()
 
 # ── Hub landing page ─────────────────────────────────────────────────────────────
+# Force app restart to clear any cached data (updated with fresh GP report)
 def page_hub():
     role    = st.session_state["role"]
     user_id = st.session_state["user_id"]
