@@ -23,12 +23,15 @@ SM_NAME_TO_USERNAME = {
     "GITTOES (AGENT)":      "james.gittoes",
     "HOUSEACCOUNTS":        "rob.werhun",
     "HITCHENS-NORTHWEST ENG": "ashley.hitchens",
+    "HITCHENS-NORTHWEST":   "ashley.hitchens",
     "HITCHENS-YORKSHIRE":   "ashley.hitchens",
     "SCOTLAND-W-HAMILTON":  "kevin.hamilton",
     "SCOTLAND-EAST-HAMILTON": "kevin.hamilton",
     "IRVINE-IRELAND":       "phil.irvine",
     "IRVINE-NTK":           "phil.irvine",
     "EAST MIDS-TURNOCK":    "chris.gibson",
+    "EAST MIDS-GIBSON":     "chris.gibson",
+    "MIDLANS-GREEN":        "ed.green",
     "IMC CUSTOMERS":        "rob.werhun",
     "INTER COMPANY":        "rob.werhun",
     "CUSTOMER FREIGHT":     "rob.werhun",
@@ -47,6 +50,7 @@ SEED_USERS = [
     ("ashley.hitchens","Ashley Hitchens","ashley.hitchens@tungaloyuk.co.uk",           "rep",              "phil.irvine"),
     ("kevin.hamilton", "Kevin Hamilton", "Kevin.Hamilton@tungaloyuk.co.uk",            "rep",              "phil.irvine"),
     ("chris.gibson",   "Chris Gibson",   "Chris.Gibson@tungaloyuk.co.uk",             "rep",              "phil.irvine"),
+    ("ed.green",       "Ed Green",       "Ed.green@tungaloyuk.co.uk",                 "rep",              None),
     ("sylwia.dubij",   "Sylwia Dubij",   "Sylwia@tungaloyuk.co.uk",                   "marketing",        None),
 ]
 
